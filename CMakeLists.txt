@@ -40,6 +40,17 @@ find_package(yaml-cpp REQUIRED)
 # nlohmann_json
 find_package(nlohmann_json 3.2.0 REQUIRED)
 
+# Mosquitto (optional, for MQTT sink reference implementation)
+find_package(PkgConfig)
+if(PkgConfig_FOUND)
+    pkg_check_modules(MOSQUITTO libmosquitto)
+endif()
+if(MOSQUITTO_FOUND)
+    message(STATUS "libmosquitto found - building MqttSink")
+else()
+    message(STATUS "libmosquitto not found - MqttSink will not be built")
+endif()
+
 # Protobuf and gRPC for OTLP bridge
 find_package(Protobuf REQUIRED)
 find_package(gRPC CONFIG QUIET)
@@ -138,11 +149,67 @@ target_link_libraries(vdr_common PUBLIC
     glog::glog
 )
 
+# VDR sinks library (output sink implementations)
+set(VDR_SINKS_SOURCES
+    src/vdr/sinks/log_sink.cpp
+    src/vdr/sinks/capture_sink.cpp
+)
+
+if(MOSQUITTO_FOUND)
+    list(APPEND VDR_SINKS_SOURCES src/vdr/sinks/mqtt_sink.cpp)
+endif()
+
+add_library(vdr_sinks STATIC ${VDR_SINKS_SOURCES})
+
+target_include_directories(vdr_sinks PUBLIC
+    ${CMAKE_SOURCE_DIR}/src
+    ${IDL_OUTPUT_DIR}
+)
+
+target_link_libraries(vdr_sinks PUBLIC
+    vdr_common
+    nlohmann_json::nlohmann_json
+)
+
+if(MOSQUITTO_FOUND)
+    target_link_libraries(vdr_sinks PUBLIC ${MOSQUITTO_LIBRARIES})
+    target_include_directories(vdr_sinks PUBLIC ${MOSQUITTO_INCLUDE_DIRS})
+    target_compile_definitions(vdr_sinks PUBLIC VDR_HAS_MQTT_SINK)
+endif()
+
+# VDR core library (subscriber, shared between vdr and tests)
+add_library(vdr_core STATIC
+    src/vdr/subscriber.cpp
+)
+
+target_include_directories(vdr_core PUBLIC
+    ${CMAKE_SOURCE_DIR}/src
+    ${IDL_OUTPUT_DIR}
+)
+
+target_link_libraries(vdr_core PUBLIC
+    vdr_common
+    vdr_sinks
+)
+
+# Testing library (test fixtures)
+add_library(vdr_testing STATIC
+    src/testing/test_probe.cpp
+    src/testing/test_vdr.cpp
+)
+
+target_include_directories(vdr_testing PUBLIC
+    ${CMAKE_SOURCE_DIR}/src
+    ${IDL_OUTPUT_DIR}
+)
+
+target_link_libraries(vdr_testing PUBLIC
+    vdr_core
+)
+
 # VDR executable
 add_executable(vdr
     src/vdr/main.cpp
-    src/vdr/subscriber.cpp
-    src/vdr/encoder.cpp
 )
 
 target_include_directories(vdr PRIVATE
@@ -151,9 +218,8 @@ target_include_directories(vdr PRIVATE
 )
 
 target_link_libraries(vdr PRIVATE
-    vdr_common
+    vdr_core
     yaml-cpp::yaml-cpp
-    nlohmann_json::nlohmann_json
     glog::glog
 )
 
@@ -371,6 +437,25 @@ if(GTest_FOUND)
     )
 
     add_test(NAME test_dds_wrapper COMMAND test_dds_wrapper)
+
+    # Integration tests
+    add_executable(test_integration
+        tests/test_integration.cpp
+    )
+
+    target_include_directories(test_integration PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+        ${IDL_OUTPUT_DIR}
+    )
+
+    target_link_libraries(test_integration PRIVATE
+        vdr_common
+        vdr_sinks
+        vdr_testing
+        GTest::gtest
+    )
+
+    add_test(NAME test_integration COMMAND test_integration)
 endif()
 
 # Installation
@@ -390,4 +475,9 @@ message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "Cyclone DDS: ${CycloneDDS_VERSION}")
 message(STATUS "IDL compiler: ${IDLC_EXECUTABLE}")
 message(STATUS "IDL output: ${IDL_OUTPUT_DIR}")
+message(STATUS "Optional dependencies:")
+message(STATUS "  libvssdag: ${vssdag_FOUND}")
+message(STATUS "  Open1722: ${Open1722_FOUND}")
+message(STATUS "  libmosquitto: ${MOSQUITTO_FOUND}")
+message(STATUS "  GTest: ${GTest_FOUND}")
 message(STATUS "")

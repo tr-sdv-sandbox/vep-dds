@@ -21,7 +21,8 @@
 
 #include "common/dds_wrapper.hpp"
 #include "vdr/subscriber.hpp"
-#include "vdr/encoder.hpp"
+#include "vdr/output_sink.hpp"
+#include "vdr/sinks/log_sink.hpp"
 
 #include <glog/logging.h>
 #include <yaml-cpp/yaml.h>
@@ -29,6 +30,7 @@
 #include <csignal>
 #include <atomic>
 #include <iostream>
+#include <memory>
 
 namespace {
 
@@ -116,43 +118,47 @@ int main(int argc, char* argv[]) {
         // Create DDS participant
         dds::Participant participant(DDS_DOMAIN_DEFAULT);
 
-        // Create encoder (simulated MQTT publisher)
-        vdr::Encoder encoder;
+        // Create output sink (default: LogSink)
+        auto sink = std::make_unique<vdr::sinks::LogSink>();
+        if (!sink->start()) {
+            LOG(FATAL) << "Failed to start output sink";
+            return 1;
+        }
 
         // Create subscription manager
         vdr::SubscriptionManager subscriptions(participant, config);
 
-        // Register callbacks - each forwards to encoder
-        subscriptions.on_vss_signal([&encoder](const telemetry_vss_Signal& msg) {
-            encoder.send(msg);
+        // Register callbacks - each forwards to sink
+        subscriptions.on_vss_signal([&sink](const telemetry_vss_Signal& msg) {
+            sink->send(msg);
         });
 
-        subscriptions.on_event([&encoder](const telemetry_events_Event& msg) {
-            encoder.send(msg);
+        subscriptions.on_event([&sink](const telemetry_events_Event& msg) {
+            sink->send(msg);
         });
 
-        subscriptions.on_gauge([&encoder](const telemetry_metrics_Gauge& msg) {
-            encoder.send(msg);
+        subscriptions.on_gauge([&sink](const telemetry_metrics_Gauge& msg) {
+            sink->send(msg);
         });
 
-        subscriptions.on_counter([&encoder](const telemetry_metrics_Counter& msg) {
-            encoder.send(msg);
+        subscriptions.on_counter([&sink](const telemetry_metrics_Counter& msg) {
+            sink->send(msg);
         });
 
-        subscriptions.on_histogram([&encoder](const telemetry_metrics_Histogram& msg) {
-            encoder.send(msg);
+        subscriptions.on_histogram([&sink](const telemetry_metrics_Histogram& msg) {
+            sink->send(msg);
         });
 
-        subscriptions.on_log_entry([&encoder](const telemetry_logs_LogEntry& msg) {
-            encoder.send(msg);
+        subscriptions.on_log_entry([&sink](const telemetry_logs_LogEntry& msg) {
+            sink->send(msg);
         });
 
-        subscriptions.on_scalar_measurement([&encoder](const telemetry_diagnostics_ScalarMeasurement& msg) {
-            encoder.send(msg);
+        subscriptions.on_scalar_measurement([&sink](const telemetry_diagnostics_ScalarMeasurement& msg) {
+            sink->send(msg);
         });
 
-        subscriptions.on_vector_measurement([&encoder](const telemetry_diagnostics_VectorMeasurement& msg) {
-            encoder.send(msg);
+        subscriptions.on_vector_measurement([&sink](const telemetry_diagnostics_VectorMeasurement& msg) {
+            sink->send(msg);
         });
 
         // Start receiving
@@ -165,10 +171,13 @@ int main(int argc, char* argv[]) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
-        // Stop subscriptions
+        // Stop subscriptions and sink
         subscriptions.stop();
+        sink->stop();
 
-        LOG(INFO) << "VDR shutdown complete.";
+        auto stats = sink->stats();
+        LOG(INFO) << "VDR shutdown complete. Messages sent: " << stats.messages_sent
+                  << ", failed: " << stats.messages_failed;
 
     } catch (const dds::Error& e) {
         LOG(FATAL) << "DDS error: " << e.what();

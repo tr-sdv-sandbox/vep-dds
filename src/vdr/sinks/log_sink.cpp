@@ -13,13 +13,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "vdr/encoder.hpp"
+#include "vdr/sinks/log_sink.hpp"
+#include "common/time_utils.hpp"
 
 #include <glog/logging.h>
 
 namespace vdr {
+namespace sinks {
 
-nlohmann::json Encoder::encode_header(const telemetry_Header& header) {
+bool LogSink::start() {
+    running_ = true;
+    LOG(INFO) << "LogSink started";
+    return true;
+}
+
+void LogSink::stop() {
+    running_ = false;
+    LOG(INFO) << "LogSink stopped. Stats: sent=" << stats_.messages_sent
+              << " failed=" << stats_.messages_failed;
+}
+
+SinkStats LogSink::stats() const {
+    std::lock_guard<std::mutex> lock(stats_mutex_);
+    return stats_;
+}
+
+nlohmann::json LogSink::encode_header(const telemetry_Header& header) {
     return {
         {"source_id", header.source_id ? header.source_id : ""},
         {"timestamp_ns", header.timestamp_ns},
@@ -28,11 +47,19 @@ nlohmann::json Encoder::encode_header(const telemetry_Header& header) {
     };
 }
 
-void Encoder::log_mqtt_publish(const std::string& topic, const nlohmann::json& payload) {
-    LOG(INFO) << "[MQTT] topic=" << topic << " payload=" << payload.dump();
+void LogSink::log_output(const std::string& topic, const nlohmann::json& payload) {
+    std::string json_str = payload.dump();
+    LOG(INFO) << "[MQTT] topic=" << topic << " payload=" << json_str;
+
+    std::lock_guard<std::mutex> lock(stats_mutex_);
+    stats_.messages_sent++;
+    stats_.bytes_sent += json_str.size();
+    stats_.last_send_timestamp_ns = utils::now_ns();
 }
 
-void Encoder::send(const telemetry_vss_Signal& msg) {
+void LogSink::send(const telemetry_vss_Signal& msg) {
+    if (!running_) return;
+
     nlohmann::json payload = {
         {"header", encode_header(msg.header)},
         {"path", msg.path ? msg.path : ""},
@@ -40,7 +67,6 @@ void Encoder::send(const telemetry_vss_Signal& msg) {
         {"value_type", static_cast<int>(msg.value_type)}
     };
 
-    // Add value based on type
     switch (msg.value_type) {
         case telemetry_vss_VALUE_TYPE_BOOL:
             payload["value"] = msg.bool_value;
@@ -62,10 +88,12 @@ void Encoder::send(const telemetry_vss_Signal& msg) {
             break;
     }
 
-    log_mqtt_publish("v1/vss/signals", payload);
+    log_output("v1/vss/signals", payload);
 }
 
-void Encoder::send(const telemetry_events_Event& msg) {
+void LogSink::send(const telemetry_events_Event& msg) {
+    if (!running_) return;
+
     nlohmann::json payload = {
         {"header", encode_header(msg.header)},
         {"event_id", msg.event_id ? msg.event_id : ""},
@@ -74,16 +102,16 @@ void Encoder::send(const telemetry_events_Event& msg) {
         {"severity", static_cast<int>(msg.severity)}
     };
 
-    // Encode payload as base64 or hex (simplified: just size for now)
     if (msg.payload._length > 0) {
         payload["payload_size"] = msg.payload._length;
-        // In production: base64 encode msg.payload._buffer
     }
 
-    log_mqtt_publish("v1/events", payload);
+    log_output("v1/events", payload);
 }
 
-void Encoder::send(const telemetry_metrics_Gauge& msg) {
+void LogSink::send(const telemetry_metrics_Gauge& msg) {
+    if (!running_) return;
+
     nlohmann::json labels = nlohmann::json::object();
     for (uint32_t i = 0; i < msg.labels._length; ++i) {
         const auto& kv = msg.labels._buffer[i];
@@ -99,10 +127,12 @@ void Encoder::send(const telemetry_metrics_Gauge& msg) {
         {"value", msg.value}
     };
 
-    log_mqtt_publish("v1/telemetry/gauges", payload);
+    log_output("v1/telemetry/gauges", payload);
 }
 
-void Encoder::send(const telemetry_metrics_Counter& msg) {
+void LogSink::send(const telemetry_metrics_Counter& msg) {
+    if (!running_) return;
+
     nlohmann::json labels = nlohmann::json::object();
     for (uint32_t i = 0; i < msg.labels._length; ++i) {
         const auto& kv = msg.labels._buffer[i];
@@ -118,10 +148,12 @@ void Encoder::send(const telemetry_metrics_Counter& msg) {
         {"value", msg.value}
     };
 
-    log_mqtt_publish("v1/telemetry/counters", payload);
+    log_output("v1/telemetry/counters", payload);
 }
 
-void Encoder::send(const telemetry_metrics_Histogram& msg) {
+void LogSink::send(const telemetry_metrics_Histogram& msg) {
+    if (!running_) return;
+
     nlohmann::json labels = nlohmann::json::object();
     for (uint32_t i = 0; i < msg.labels._length; ++i) {
         const auto& kv = msg.labels._buffer[i];
@@ -148,10 +180,12 @@ void Encoder::send(const telemetry_metrics_Histogram& msg) {
         {"buckets", buckets}
     };
 
-    log_mqtt_publish("v1/telemetry/histograms", payload);
+    log_output("v1/telemetry/histograms", payload);
 }
 
-void Encoder::send(const telemetry_logs_LogEntry& msg) {
+void LogSink::send(const telemetry_logs_LogEntry& msg) {
+    if (!running_) return;
+
     nlohmann::json fields = nlohmann::json::object();
     for (uint32_t i = 0; i < msg.fields._length; ++i) {
         const auto& kv = msg.fields._buffer[i];
@@ -168,10 +202,12 @@ void Encoder::send(const telemetry_logs_LogEntry& msg) {
         {"fields", fields}
     };
 
-    log_mqtt_publish("v1/logs", payload);
+    log_output("v1/logs", payload);
 }
 
-void Encoder::send(const telemetry_diagnostics_ScalarMeasurement& msg) {
+void LogSink::send(const telemetry_diagnostics_ScalarMeasurement& msg) {
+    if (!running_) return;
+
     nlohmann::json payload = {
         {"header", encode_header(msg.header)},
         {"variable_id", msg.variable_id ? msg.variable_id : ""},
@@ -180,10 +216,12 @@ void Encoder::send(const telemetry_diagnostics_ScalarMeasurement& msg) {
         {"value", msg.value}
     };
 
-    log_mqtt_publish("v1/diagnostics/scalar", payload);
+    log_output("v1/diagnostics/scalar", payload);
 }
 
-void Encoder::send(const telemetry_diagnostics_VectorMeasurement& msg) {
+void LogSink::send(const telemetry_diagnostics_VectorMeasurement& msg) {
+    if (!running_) return;
+
     nlohmann::json values = nlohmann::json::array();
     for (uint32_t i = 0; i < msg.values._length; ++i) {
         values.push_back(msg.values._buffer[i]);
@@ -197,7 +235,8 @@ void Encoder::send(const telemetry_diagnostics_VectorMeasurement& msg) {
         {"values", values}
     };
 
-    log_mqtt_publish("v1/diagnostics/vector", payload);
+    log_output("v1/diagnostics/vector", payload);
 }
 
+}  // namespace sinks
 }  // namespace vdr
