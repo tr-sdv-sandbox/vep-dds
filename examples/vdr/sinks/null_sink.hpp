@@ -37,7 +37,7 @@ public:
     bool start() override { running_ = true; return true; }
     void stop() override { running_ = false; }
 
-    void send(const telemetry_vss_Signal&) override { ++count_; }
+    void send(const vss_Signal&) override { ++count_; }
     void send(const telemetry_events_Event&) override { ++count_; }
     void send(const telemetry_metrics_Gauge&) override { ++count_; }
     void send(const telemetry_metrics_Counter&) override { ++count_; }

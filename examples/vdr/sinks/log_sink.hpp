@@ -42,7 +42,7 @@ public:
     bool start() override;
     void stop() override;
 
-    void send(const telemetry_vss_Signal& msg) override;
+    void send(const vss_Signal& msg) override;
     void send(const telemetry_events_Event& msg) override;
     void send(const telemetry_metrics_Gauge& msg) override;
     void send(const telemetry_metrics_Counter& msg) override;
@@ -56,7 +56,7 @@ public:
     std::string name() const override { return "LogSink"; }
 
 private:
-    nlohmann::json encode_header(const telemetry_Header& header);
+    nlohmann::json encode_header(const vss_types_Header& header);
     void log_output(const std::string& topic, const nlohmann::json& payload);
 
     std::atomic<bool> running_{false};

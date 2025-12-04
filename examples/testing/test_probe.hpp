@@ -22,6 +22,8 @@
 #include "common/qos_profiles.hpp"
 #include "common/time_utils.hpp"
 #include "telemetry.h"
+#include "vss_signal.h"
+#include "vss_types.h"
 
 #include <atomic>
 #include <chrono>
@@ -65,19 +67,19 @@ public:
 
     /// Send a VSS signal with double value
     void send_signal(const std::string& path, double value,
-                     telemetry_vss_Quality quality = telemetry_vss_QUALITY_VALID);
+                     vss_types_Quality quality = vss_types_QUALITY_VALID);
 
     /// Send a VSS signal with string value
     void send_signal(const std::string& path, const std::string& value,
-                     telemetry_vss_Quality quality = telemetry_vss_QUALITY_VALID);
+                     vss_types_Quality quality = vss_types_QUALITY_VALID);
 
     /// Send a VSS signal with int value
     void send_signal(const std::string& path, int32_t value,
-                     telemetry_vss_Quality quality = telemetry_vss_QUALITY_VALID);
+                     vss_types_Quality quality = vss_types_QUALITY_VALID);
 
     /// Send a VSS signal with bool value
     void send_signal(const std::string& path, bool value,
-                     telemetry_vss_Quality quality = telemetry_vss_QUALITY_VALID);
+                     vss_types_Quality quality = vss_types_QUALITY_VALID);
 
     /// @}
 

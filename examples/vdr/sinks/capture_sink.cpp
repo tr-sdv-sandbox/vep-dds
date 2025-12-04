@@ -18,7 +18,7 @@
 namespace vdr {
 namespace sinks {
 
-void CaptureSink::send(const telemetry_vss_Signal& msg) {
+void CaptureSink::send(const vss_Signal& msg) {
     if (!running_) return;
 
     CapturedSignal cap;
@@ -27,13 +27,19 @@ void CaptureSink::send(const telemetry_vss_Signal& msg) {
     cap.timestamp_ns = msg.header.timestamp_ns;
     cap.seq_num = msg.header.seq_num;
     cap.quality = msg.quality;
-    cap.value_type = msg.value_type;
-    cap.bool_value = msg.bool_value;
-    cap.int32_value = msg.int32_value;
-    cap.int64_value = msg.int64_value;
-    cap.float_value = msg.float_value;
-    cap.double_value = msg.double_value;
-    cap.string_value = msg.string_value ? msg.string_value : "";
+    cap.value_type = msg.value.type;
+    cap.bool_value = msg.value.bool_value;
+    cap.int8_value = static_cast<int8_t>(msg.value.int8_value);
+    cap.int16_value = msg.value.int16_value;
+    cap.int32_value = msg.value.int32_value;
+    cap.int64_value = msg.value.int64_value;
+    cap.uint8_value = msg.value.uint8_value;
+    cap.uint16_value = msg.value.uint16_value;
+    cap.uint32_value = msg.value.uint32_value;
+    cap.uint64_value = msg.value.uint64_value;
+    cap.float_value = msg.value.float_value;
+    cap.double_value = msg.value.double_value;
+    cap.string_value = msg.value.string_value ? msg.value.string_value : "";
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -54,10 +60,8 @@ void CaptureSink::send(const telemetry_events_Event& msg) {
     cap.timestamp_ns = msg.header.timestamp_ns;
     cap.seq_num = msg.header.seq_num;
 
-    if (msg.payload._length > 0 && msg.payload._buffer) {
-        cap.payload.assign(msg.payload._buffer,
-                          msg.payload._buffer + msg.payload._length);
-    }
+    // Note: Event no longer has payload field - it has attributes and context instead
+    // Payload field removed from CapturedEvent or kept empty
 
     {
         std::lock_guard<std::mutex> lock(mutex_);

@@ -17,6 +17,7 @@
 #include "common/time_utils.hpp"
 
 #include <glog/logging.h>
+#include <cstring>
 
 namespace vdr {
 namespace sinks {
@@ -187,7 +188,7 @@ void MqttSink::publish(const std::string& topic, const nlohmann::json& payload) 
     queue_cv_.notify_one();
 }
 
-nlohmann::json MqttSink::encode_header(const telemetry_Header& header) {
+nlohmann::json MqttSink::encode_header(const vss_types_Header& header) {
     return {
         {"source_id", header.source_id ? header.source_id : ""},
         {"timestamp_ns", header.timestamp_ns},
@@ -196,32 +197,202 @@ nlohmann::json MqttSink::encode_header(const telemetry_Header& header) {
     };
 }
 
-void MqttSink::send(const telemetry_vss_Signal& msg) {
+// Helper to encode a struct field value to JSON
+nlohmann::json encode_struct_field_value(const vss_types_StructField& field) {
+    switch (field.type) {
+        case vss_types_VALUE_TYPE_BOOL:
+            return field.bool_value;
+        case vss_types_VALUE_TYPE_INT8:
+            return static_cast<int>(field.int8_value);
+        case vss_types_VALUE_TYPE_INT16:
+            return field.int16_value;
+        case vss_types_VALUE_TYPE_INT32:
+            return field.int32_value;
+        case vss_types_VALUE_TYPE_INT64:
+            return field.int64_value;
+        case vss_types_VALUE_TYPE_UINT8:
+            return field.uint8_value;
+        case vss_types_VALUE_TYPE_UINT16:
+            return field.uint16_value;
+        case vss_types_VALUE_TYPE_UINT32:
+            return field.uint32_value;
+        case vss_types_VALUE_TYPE_UINT64:
+            return field.uint64_value;
+        case vss_types_VALUE_TYPE_FLOAT:
+            return field.float_value;
+        case vss_types_VALUE_TYPE_DOUBLE:
+            return field.double_value;
+        case vss_types_VALUE_TYPE_STRING:
+            return field.string_value ? field.string_value : "";
+        case vss_types_VALUE_TYPE_BOOL_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < field.bool_array._length; ++i) {
+                arr.push_back(static_cast<bool>(field.bool_array._buffer[i]));
+            }
+            return arr;
+        }
+        case vss_types_VALUE_TYPE_INT32_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < field.int32_array._length; ++i) {
+                arr.push_back(field.int32_array._buffer[i]);
+            }
+            return arr;
+        }
+        case vss_types_VALUE_TYPE_FLOAT_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < field.float_array._length; ++i) {
+                arr.push_back(field.float_array._buffer[i]);
+            }
+            return arr;
+        }
+        case vss_types_VALUE_TYPE_DOUBLE_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < field.double_array._length; ++i) {
+                arr.push_back(field.double_array._buffer[i]);
+            }
+            return arr;
+        }
+        default:
+            return nullptr;
+    }
+}
+
+// Helper to encode a StructValue to JSON
+nlohmann::json encode_struct_value(const vss_types_StructValue& struct_val) {
+    nlohmann::json obj = nlohmann::json::object();
+
+    // Add type name if present
+    if (struct_val.type_name && strlen(struct_val.type_name) > 0) {
+        obj["_type"] = struct_val.type_name;
+    }
+
+    // Encode all fields
+    for (uint32_t i = 0; i < struct_val.fields._length; ++i) {
+        const auto& field = struct_val.fields._buffer[i];
+        if (field.name) {
+            obj[field.name] = encode_struct_field_value(field);
+        }
+    }
+
+    return obj;
+}
+
+void MqttSink::send(const vss_Signal& msg) {
     nlohmann::json payload = {
         {"header", encode_header(msg.header)},
         {"path", msg.path ? msg.path : ""},
         {"quality", static_cast<int>(msg.quality)},
-        {"value_type", static_cast<int>(msg.value_type)}
+        {"value_type", static_cast<int>(msg.value.type)}
     };
 
-    switch (msg.value_type) {
-        case telemetry_vss_VALUE_TYPE_BOOL:
-            payload["value"] = msg.bool_value;
+    switch (msg.value.type) {
+        case vss_types_VALUE_TYPE_BOOL:
+            payload["value"] = msg.value.bool_value;
             break;
-        case telemetry_vss_VALUE_TYPE_INT32:
-            payload["value"] = msg.int32_value;
+        case vss_types_VALUE_TYPE_INT8:
+            payload["value"] = static_cast<int>(msg.value.int8_value);
             break;
-        case telemetry_vss_VALUE_TYPE_INT64:
-            payload["value"] = msg.int64_value;
+        case vss_types_VALUE_TYPE_INT16:
+            payload["value"] = msg.value.int16_value;
             break;
-        case telemetry_vss_VALUE_TYPE_FLOAT:
-            payload["value"] = msg.float_value;
+        case vss_types_VALUE_TYPE_INT32:
+            payload["value"] = msg.value.int32_value;
             break;
-        case telemetry_vss_VALUE_TYPE_DOUBLE:
-            payload["value"] = msg.double_value;
+        case vss_types_VALUE_TYPE_INT64:
+            payload["value"] = msg.value.int64_value;
             break;
-        case telemetry_vss_VALUE_TYPE_STRING:
-            payload["value"] = msg.string_value ? msg.string_value : "";
+        case vss_types_VALUE_TYPE_UINT8:
+            payload["value"] = msg.value.uint8_value;
+            break;
+        case vss_types_VALUE_TYPE_UINT16:
+            payload["value"] = msg.value.uint16_value;
+            break;
+        case vss_types_VALUE_TYPE_UINT32:
+            payload["value"] = msg.value.uint32_value;
+            break;
+        case vss_types_VALUE_TYPE_UINT64:
+            payload["value"] = msg.value.uint64_value;
+            break;
+        case vss_types_VALUE_TYPE_FLOAT:
+            payload["value"] = msg.value.float_value;
+            break;
+        case vss_types_VALUE_TYPE_DOUBLE:
+            payload["value"] = msg.value.double_value;
+            break;
+        case vss_types_VALUE_TYPE_STRING:
+            payload["value"] = msg.value.string_value ? msg.value.string_value : "";
+            break;
+
+        // Array types
+        case vss_types_VALUE_TYPE_BOOL_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < msg.value.bool_array._length; ++i) {
+                arr.push_back(static_cast<bool>(msg.value.bool_array._buffer[i]));
+            }
+            payload["value"] = arr;
+            break;
+        }
+        case vss_types_VALUE_TYPE_INT32_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < msg.value.int32_array._length; ++i) {
+                arr.push_back(msg.value.int32_array._buffer[i]);
+            }
+            payload["value"] = arr;
+            break;
+        }
+        case vss_types_VALUE_TYPE_INT64_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < msg.value.int64_array._length; ++i) {
+                arr.push_back(msg.value.int64_array._buffer[i]);
+            }
+            payload["value"] = arr;
+            break;
+        }
+        case vss_types_VALUE_TYPE_FLOAT_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < msg.value.float_array._length; ++i) {
+                arr.push_back(msg.value.float_array._buffer[i]);
+            }
+            payload["value"] = arr;
+            break;
+        }
+        case vss_types_VALUE_TYPE_DOUBLE_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < msg.value.double_array._length; ++i) {
+                arr.push_back(msg.value.double_array._buffer[i]);
+            }
+            payload["value"] = arr;
+            break;
+        }
+        case vss_types_VALUE_TYPE_STRING_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < msg.value.string_array._length; ++i) {
+                arr.push_back(msg.value.string_array._buffer[i] ? msg.value.string_array._buffer[i] : "");
+            }
+            payload["value"] = arr;
+            break;
+        }
+
+        // Struct types
+        case vss_types_VALUE_TYPE_STRUCT:
+            payload["value"] = encode_struct_value(msg.value.struct_value);
+            break;
+
+        case vss_types_VALUE_TYPE_STRUCT_ARRAY: {
+            nlohmann::json arr = nlohmann::json::array();
+            for (uint32_t i = 0; i < msg.value.struct_array._length; ++i) {
+                arr.push_back(encode_struct_value(msg.value.struct_array._buffer[i]));
+            }
+            payload["value"] = arr;
+            break;
+        }
+
+        case vss_types_VALUE_TYPE_EMPTY:
+            payload["value"] = nullptr;
+            break;
+
+        default:
+            payload["value"] = "<unsupported_type>";
             break;
     }
 
@@ -237,8 +408,21 @@ void MqttSink::send(const telemetry_events_Event& msg) {
         {"severity", static_cast<int>(msg.severity)}
     };
 
-    if (msg.payload._length > 0) {
-        payload["payload_size"] = msg.payload._length;
+    // Encode attributes as key-value pairs
+    if (msg.attributes._length > 0) {
+        nlohmann::json attrs = nlohmann::json::object();
+        for (uint32_t i = 0; i < msg.attributes._length; ++i) {
+            const auto& kv = msg.attributes._buffer[i];
+            if (kv.key && kv.value) {
+                attrs[kv.key] = kv.value;
+            }
+        }
+        payload["attributes"] = attrs;
+    }
+
+    // Record context signal count
+    if (msg.context._length > 0) {
+        payload["context_signal_count"] = msg.context._length;
     }
 
     publish("events", payload);
@@ -337,7 +521,7 @@ void MqttSink::send(const telemetry_diagnostics_ScalarMeasurement& msg) {
         {"header", encode_header(msg.header)},
         {"variable_id", msg.variable_id ? msg.variable_id : ""},
         {"unit", msg.unit ? msg.unit : ""},
-        {"mtype", static_cast<int>(msg.mtype)},
+        {"measurement_type", static_cast<int>(msg.measurement_type)},
         {"value", msg.value}
     };
 
@@ -354,7 +538,7 @@ void MqttSink::send(const telemetry_diagnostics_VectorMeasurement& msg) {
         {"header", encode_header(msg.header)},
         {"variable_id", msg.variable_id ? msg.variable_id : ""},
         {"unit", msg.unit ? msg.unit : ""},
-        {"mtype", static_cast<int>(msg.mtype)},
+        {"measurement_type", static_cast<int>(msg.measurement_type)},
         {"values", values}
     };
 

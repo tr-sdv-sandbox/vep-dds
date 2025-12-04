@@ -1,0 +1,373 @@
+// Copyright 2025 VDR-Light Contributors
+// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/// @file telemetry.idl
+/// @brief DDS IDL definitions for VDR ecosystem
+///
+/// Extends libvss-types IDL with additional telemetry message types.
+/// Uses vss::types from libvss-types for core value types.
+///
+/// Type system aligned with:
+/// - COVESA VSS (Vehicle Signal Specification) 5.x
+/// - libvss-types IDL and C++ library
+
+#include "vss_signal.idl"
+
+module telemetry {
+
+    // ================================================================
+    // Re-export vss::types for convenience
+    // These are imported from libvss-types via vss_signal.idl
+    // ================================================================
+    // Available types from vss::types:
+    //   - Quality (QUALITY_UNKNOWN, QUALITY_VALID, QUALITY_INVALID, QUALITY_NOT_AVAILABLE)
+    //   - ValueType enum
+    //   - Value struct
+    //   - Header struct
+    //   - KeyValue struct
+    //
+    // Available types from vss:
+    //   - Signal struct (with path as key)
+    //   - SignalBatch struct
+
+    // ================================================================
+    // VEHICLE EVENTS
+    // ================================================================
+
+    module events {
+
+        enum Severity {
+            SEVERITY_INFO,
+            SEVERITY_WARNING,
+            SEVERITY_ERROR,
+            SEVERITY_CRITICAL
+        };
+
+        /**
+         * A vehicle event with optional signal context.
+         */
+        struct Event {
+            string event_id;                     // Unique event identifier
+            vss::types::Header header;
+            string category;                     // "ADAS", "POWERTRAIN", etc.
+            string event_type;                   // "harsh_brake", "dtc", etc.
+            Severity severity;
+            sequence<vss::types::KeyValue> attributes;  // Event-specific attributes
+            sequence<vss::Signal> context;       // Signal snapshot at event time
+        };
+        #pragma keylist Event event_id
+
+    }; // module events
+
+    // ================================================================
+    // DIAGNOSTICS (scraped statistics)
+    // ================================================================
+
+    module diagnostics {
+
+        enum MeasurementType {
+            MEASUREMENT_TYPE_ACCUMULATED,        // Cumulative (counters)
+            MEASUREMENT_TYPE_MOMENTARY           // Point-in-time (gauges)
+        };
+
+        /**
+         * Scalar diagnostic measurement.
+         */
+        struct ScalarMeasurement {
+            string variable_id;
+            vss::types::Header header;
+            string unit;
+            MeasurementType measurement_type;
+            double value;
+        };
+        #pragma keylist ScalarMeasurement variable_id
+
+        /**
+         * Vector diagnostic measurement (histograms, distributions).
+         */
+        struct VectorMeasurement {
+            string variable_id;
+            vss::types::Header header;
+            string unit;
+            MeasurementType measurement_type;
+            sequence<double> values;
+
+            // Optional histogram metadata
+            sequence<double> bin_boundaries;     // For histograms
+            double window_duration_s;            // For sliding windows
+        };
+        #pragma keylist VectorMeasurement variable_id
+
+        /**
+         * Matrix diagnostic measurement (2D data).
+         */
+        struct MatrixMeasurement {
+            string variable_id;
+            vss::types::Header header;
+            string unit;
+            MeasurementType measurement_type;
+            sequence<double> values;             // Row-major flattened
+            unsigned long rows;
+            unsigned long cols;
+        };
+        #pragma keylist MatrixMeasurement variable_id
+
+    }; // module diagnostics
+
+    // ================================================================
+    // PROMETHEUS-STYLE METRICS
+    // ================================================================
+
+    module metrics {
+
+        /**
+         * Counter metric (cumulative, only increases).
+         */
+        struct Counter {
+            string name;
+            vss::types::Header header;
+            sequence<vss::types::KeyValue> labels;
+            double value;
+        };
+        #pragma keylist Counter name
+
+        /**
+         * Gauge metric (can go up or down).
+         */
+        struct Gauge {
+            string name;
+            vss::types::Header header;
+            sequence<vss::types::KeyValue> labels;
+            double value;
+        };
+        #pragma keylist Gauge name
+
+        /**
+         * Histogram bucket.
+         */
+        struct HistogramBucket {
+            double upper_bound;
+            unsigned long long cumulative_count;
+        };
+
+        /**
+         * Histogram metric.
+         */
+        struct Histogram {
+            string name;
+            vss::types::Header header;
+            sequence<vss::types::KeyValue> labels;
+            unsigned long long sample_count;
+            double sample_sum;
+            sequence<HistogramBucket> buckets;
+        };
+        #pragma keylist Histogram name
+
+        /**
+         * Summary quantile.
+         */
+        struct SummaryQuantile {
+            double quantile;                     // 0.5, 0.9, 0.99, etc.
+            double value;
+        };
+
+        /**
+         * Summary metric.
+         */
+        struct Summary {
+            string name;
+            vss::types::Header header;
+            sequence<vss::types::KeyValue> labels;
+            unsigned long long sample_count;
+            double sample_sum;
+            sequence<SummaryQuantile> quantiles;
+        };
+        #pragma keylist Summary name
+
+    }; // module metrics
+
+    // ================================================================
+    // IEEE 1722 AVTP (CAN/LIN/FlexRay tunneling)
+    // ================================================================
+
+    module avtp {
+
+        /**
+         * AVTP frame type indicators.
+         */
+        enum AcfType {
+            ACF_TYPE_CAN,
+            ACF_TYPE_CAN_BRIEF,
+            ACF_TYPE_LIN,
+            ACF_TYPE_FLEXRAY,
+            ACF_TYPE_SENSOR,
+            ACF_TYPE_GPC
+        };
+
+        /**
+         * CAN frame flags.
+         */
+        struct CanFlags {
+            boolean is_extended_id;              // Extended (29-bit) vs standard (11-bit) ID
+            boolean is_fd;                       // CAN-FD frame
+            boolean is_brs;                      // Bit rate switch (CAN-FD)
+            boolean is_esi;                      // Error state indicator (CAN-FD)
+            boolean is_rtr;                      // Remote transmission request
+        };
+
+        /**
+         * ACF CAN frame - CAN message encapsulated in AVTP.
+         * Maps to IEEE 1722 ACF CAN PDU.
+         */
+        struct AcfCanFrame {
+            vss::types::Header header;
+            unsigned long long stream_id;        // AVTP stream identifier
+            unsigned long can_id;                // CAN arbitration ID
+            octet bus_id;                        // CAN bus identifier (0-31)
+            CanFlags flags;
+            sequence<octet, 64> payload;         // CAN data (up to 64 bytes for CAN-FD)
+            unsigned long long avtp_timestamp;   // AVTP presentation timestamp
+            unsigned long sequence_num;          // AVTP sequence number
+        };
+        #pragma keylist AcfCanFrame stream_id can_id
+
+        /**
+         * Batch of CAN frames for efficiency.
+         * TSCF (Time-Synchronous Control Format) can carry multiple ACF messages.
+         */
+        struct AcfCanBatch {
+            vss::types::Header header;
+            unsigned long long stream_id;
+            sequence<AcfCanFrame> frames;
+        };
+        #pragma keylist AcfCanBatch stream_id
+
+        /**
+         * CAN trace (triggered capture for debugging).
+         */
+        struct CanTrace {
+            vss::types::Header header;
+            long long start_time_ns;
+            long long end_time_ns;
+            string trigger_event_id;             // Correlation to triggering event
+            sequence<AcfCanFrame> frames;
+        };
+        #pragma keylist CanTrace
+
+        /**
+         * AVTP stream statistics for monitoring.
+         */
+        struct StreamStats {
+            vss::types::Header header;
+            unsigned long long stream_id;
+            unsigned long long frames_received;
+            unsigned long long frames_sent;
+            unsigned long long sequence_errors;
+            unsigned long long timestamp_errors;
+            unsigned long long bytes_total;
+            double average_latency_us;
+        };
+        #pragma keylist StreamStats stream_id
+
+    }; // module avtp
+
+    // ================================================================
+    // LOG ENTRIES
+    // ================================================================
+
+    module logs {
+
+        enum Level {
+            LEVEL_DEBUG,
+            LEVEL_INFO,
+            LEVEL_WARN,
+            LEVEL_ERROR
+        };
+
+        /**
+         * A log entry.
+         */
+        struct LogEntry {
+            vss::types::Header header;
+            Level level;
+            string component;                    // Software component
+            string message;                      // Log message
+            sequence<vss::types::KeyValue> fields;  // Structured fields
+        };
+        #pragma keylist LogEntry
+
+    }; // module logs
+
+    // ================================================================
+    // OPAQUE DATA (freeze frames, internal state dumps)
+    // ================================================================
+
+    module opaque {
+
+        /**
+         * Freeze frame - triggered capture of raw data.
+         */
+        struct FreezeFrame {
+            vss::types::Header header;
+            string frame_type;                   // Type identifier
+            string trigger_event_id;             // What triggered the capture
+            sequence<octet> payload;             // Raw bytes
+            sequence<vss::types::KeyValue> metadata;  // Type-specific metadata
+        };
+        #pragma keylist FreezeFrame
+
+        /**
+         * State snapshot - periodic or triggered state dump.
+         */
+        struct StateSnapshot {
+            vss::types::Header header;
+            string component_id;                 // Which component
+            string state_type;                   // Type of state
+            sequence<octet> payload;             // Serialized state
+        };
+        #pragma keylist StateSnapshot
+
+    }; // module opaque
+
+    // ================================================================
+    // CYBERSECURITY
+    // ================================================================
+
+    module security {
+
+        enum ThreatLevel {
+            THREAT_LEVEL_LOW,
+            THREAT_LEVEL_MEDIUM,
+            THREAT_LEVEL_HIGH,
+            THREAT_LEVEL_CRITICAL
+        };
+
+        /**
+         * Security incident for VSOC alerting.
+         */
+        struct Incident {
+            string incident_id;
+            vss::types::Header header;
+            ThreatLevel threat_level;
+            string incident_type;                // Type of incident
+            string description;
+            sequence<vss::types::KeyValue> indicators;  // IOCs, evidence
+            sequence<octet> raw_evidence;        // Optional raw data
+        };
+        #pragma keylist Incident incident_id
+
+    }; // module security
+
+}; // module telemetry

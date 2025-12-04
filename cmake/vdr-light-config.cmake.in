@@ -1,0 +1,27 @@
+@PACKAGE_INIT@
+
+# VDR-Light CMake Config
+#
+# This file provides the vdr-light library targets for use in other projects.
+#
+# Targets provided:
+#   vdr::common   - DDS wrappers, utilities, QoS profiles
+#   vdr::sinks    - Output sink implementations (log, capture, mqtt)
+#   vdr::core     - Subscriber infrastructure
+#   vdr::testing  - Test fixtures
+#
+# Usage:
+#   find_package(vdr-light REQUIRED)
+#   target_link_libraries(my_target PRIVATE vdr::common vdr::core)
+
+include(CMakeFindDependencyMacro)
+
+# Required dependencies
+find_dependency(CycloneDDS)
+find_dependency(glog)
+find_dependency(nlohmann_json 3.2.0)
+
+# Include the targets
+include("${CMAKE_CURRENT_LIST_DIR}/vdr-light-targets.cmake")
+
+check_required_components(vdr-light)

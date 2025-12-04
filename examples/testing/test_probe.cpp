@@ -38,7 +38,7 @@ bool TestProbe::start() {
 
         auto signal_qos = dds::qos_profiles::reliable_standard(100);
         topic_signal_ = std::make_unique<dds::Topic>(
-            *participant_, &telemetry_vss_Signal_desc,
+            *participant_, &vss_Signal_desc,
             "rt/vss/signals", signal_qos.get());
         writer_signal_ = std::make_unique<dds::Writer>(
             *participant_, *topic_signal_, signal_qos.get());
@@ -86,72 +86,72 @@ bool TestProbe::restart() {
 }
 
 void TestProbe::send_signal(const std::string& path, double value,
-                            telemetry_vss_Quality quality) {
+                            vss_types_Quality quality) {
     if (!running_) return;
 
-    telemetry_vss_Signal msg = {};
+    vss_Signal msg = {};
     msg.path = const_cast<char*>(path.c_str());
     msg.header.source_id = const_cast<char*>(source_id_.c_str());
     msg.header.timestamp_ns = utils::now_ns();
     msg.header.seq_num = seq_++;
     msg.header.correlation_id = const_cast<char*>("");
     msg.quality = quality;
-    msg.value_type = telemetry_vss_VALUE_TYPE_DOUBLE;
-    msg.double_value = value;
+    msg.value.type = vss_types_VALUE_TYPE_DOUBLE;
+    msg.value.double_value = value;
 
     writer_signal_->write(msg);
     ++signals_sent_;
 }
 
 void TestProbe::send_signal(const std::string& path, const std::string& value,
-                            telemetry_vss_Quality quality) {
+                            vss_types_Quality quality) {
     if (!running_) return;
 
-    telemetry_vss_Signal msg = {};
+    vss_Signal msg = {};
     msg.path = const_cast<char*>(path.c_str());
     msg.header.source_id = const_cast<char*>(source_id_.c_str());
     msg.header.timestamp_ns = utils::now_ns();
     msg.header.seq_num = seq_++;
     msg.header.correlation_id = const_cast<char*>("");
     msg.quality = quality;
-    msg.value_type = telemetry_vss_VALUE_TYPE_STRING;
-    msg.string_value = const_cast<char*>(value.c_str());
+    msg.value.type = vss_types_VALUE_TYPE_STRING;
+    msg.value.string_value = const_cast<char*>(value.c_str());
 
     writer_signal_->write(msg);
     ++signals_sent_;
 }
 
 void TestProbe::send_signal(const std::string& path, int32_t value,
-                            telemetry_vss_Quality quality) {
+                            vss_types_Quality quality) {
     if (!running_) return;
 
-    telemetry_vss_Signal msg = {};
+    vss_Signal msg = {};
     msg.path = const_cast<char*>(path.c_str());
     msg.header.source_id = const_cast<char*>(source_id_.c_str());
     msg.header.timestamp_ns = utils::now_ns();
     msg.header.seq_num = seq_++;
     msg.header.correlation_id = const_cast<char*>("");
     msg.quality = quality;
-    msg.value_type = telemetry_vss_VALUE_TYPE_INT32;
-    msg.int32_value = value;
+    msg.value.type = vss_types_VALUE_TYPE_INT32;
+    msg.value.int32_value = value;
 
     writer_signal_->write(msg);
     ++signals_sent_;
 }
 
 void TestProbe::send_signal(const std::string& path, bool value,
-                            telemetry_vss_Quality quality) {
+                            vss_types_Quality quality) {
     if (!running_) return;
 
-    telemetry_vss_Signal msg = {};
+    vss_Signal msg = {};
     msg.path = const_cast<char*>(path.c_str());
     msg.header.source_id = const_cast<char*>(source_id_.c_str());
     msg.header.timestamp_ns = utils::now_ns();
     msg.header.seq_num = seq_++;
     msg.header.correlation_id = const_cast<char*>("");
     msg.quality = quality;
-    msg.value_type = telemetry_vss_VALUE_TYPE_BOOL;
-    msg.bool_value = value;
+    msg.value.type = vss_types_VALUE_TYPE_BOOL;
+    msg.value.bool_value = value;
 
     writer_signal_->write(msg);
     ++signals_sent_;
@@ -162,6 +162,7 @@ void TestProbe::send_event(const std::string& category,
                            telemetry_events_Severity severity,
                            const std::vector<uint8_t>& payload) {
     if (!running_) return;
+    (void)payload;  // Payload field no longer exists, using attributes/context instead
 
     std::string event_id = utils::generate_uuid();
 
@@ -175,11 +176,13 @@ void TestProbe::send_event(const std::string& category,
     msg.event_type = const_cast<char*>(event_type.c_str());
     msg.severity = severity;
 
-    if (!payload.empty()) {
-        msg.payload._buffer = const_cast<uint8_t*>(payload.data());
-        msg.payload._length = static_cast<uint32_t>(payload.size());
-        msg.payload._maximum = static_cast<uint32_t>(payload.size());
-    }
+    // Attributes and context (replacing old payload)
+    msg.attributes._buffer = nullptr;
+    msg.attributes._length = 0;
+    msg.attributes._maximum = 0;
+    msg.context._buffer = nullptr;
+    msg.context._length = 0;
+    msg.context._maximum = 0;
 
     writer_event_->write(msg);
     ++events_sent_;

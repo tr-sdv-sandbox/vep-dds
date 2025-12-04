@@ -22,6 +22,7 @@
 /// can target different backends: logging, MQTT, cloud APIs, etc.
 
 #include "telemetry.h"
+#include "vss_signal.h"
 
 #include <cstdint>
 #include <memory>
@@ -54,7 +55,7 @@ public:
 
     /// @name Message sending
     /// @{
-    virtual void send(const telemetry_vss_Signal& msg) = 0;
+    virtual void send(const vss_Signal& msg) = 0;
     virtual void send(const telemetry_events_Event& msg) = 0;
     virtual void send(const telemetry_metrics_Gauge& msg) = 0;
     virtual void send(const telemetry_metrics_Counter& msg) = 0;

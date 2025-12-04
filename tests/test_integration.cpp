@@ -442,9 +442,9 @@ TEST_F(IntegrationTest, QualityFlags_Preserved) {
     std::this_thread::sleep_for(200ms);
 
     // Send signals with different quality
-    probe.send_signal("Vehicle.Valid", 1.0, telemetry_vss_QUALITY_VALID);
-    probe.send_signal("Vehicle.Invalid", 2.0, telemetry_vss_QUALITY_INVALID);
-    probe.send_signal("Vehicle.NotAvailable", 3.0, telemetry_vss_QUALITY_NOT_AVAILABLE);
+    probe.send_signal("Vehicle.Valid", 1.0, vss_types_QUALITY_VALID);
+    probe.send_signal("Vehicle.Invalid", 2.0, vss_types_QUALITY_INVALID);
+    probe.send_signal("Vehicle.NotAvailable", 3.0, vss_types_QUALITY_NOT_AVAILABLE);
 
     ASSERT_TRUE(capture->wait_for_signals(3, 2000ms));
 
@@ -454,11 +454,11 @@ TEST_F(IntegrationTest, QualityFlags_Preserved) {
     // Find and verify each quality
     for (const auto& sig : signals) {
         if (sig.path == "Vehicle.Valid") {
-            EXPECT_EQ(sig.quality, telemetry_vss_QUALITY_VALID);
+            EXPECT_EQ(sig.quality, vss_types_QUALITY_VALID);
         } else if (sig.path == "Vehicle.Invalid") {
-            EXPECT_EQ(sig.quality, telemetry_vss_QUALITY_INVALID);
+            EXPECT_EQ(sig.quality, vss_types_QUALITY_INVALID);
         } else if (sig.path == "Vehicle.NotAvailable") {
-            EXPECT_EQ(sig.quality, telemetry_vss_QUALITY_NOT_AVAILABLE);
+            EXPECT_EQ(sig.quality, vss_types_QUALITY_NOT_AVAILABLE);
         }
     }
 

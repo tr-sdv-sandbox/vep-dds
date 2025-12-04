@@ -23,6 +23,7 @@
 #include "common/qos_profiles.hpp"
 #include "common/time_utils.hpp"
 #include "telemetry.h"
+#include "vss_types.h"
 
 #include <glog/logging.h>
 
@@ -43,8 +44,8 @@ void signal_handler(int signum) {
 }
 
 // Helper to create a KeyValue
-telemetry_KeyValue make_label(const char* key, const char* value) {
-    telemetry_KeyValue kv = {};
+vss_types_KeyValue make_label(const char* key, const char* value) {
+    vss_types_KeyValue kv = {};
     kv.key = const_cast<char*>(key);
     kv.value = const_cast<char*>(value);
     return kv;
@@ -101,9 +102,9 @@ int main(int argc, char* argv[]) {
         double error_count = 0;
 
         // Pre-allocate label arrays
-        telemetry_KeyValue gauge_labels[2];
-        telemetry_KeyValue counter_labels[2];
-        telemetry_KeyValue histogram_labels[1];
+        vss_types_KeyValue gauge_labels[2];
+        vss_types_KeyValue counter_labels[2];
+        vss_types_KeyValue histogram_labels[1];
 
         // Pre-allocate histogram buckets
         telemetry_metrics_HistogramBucket buckets[6];

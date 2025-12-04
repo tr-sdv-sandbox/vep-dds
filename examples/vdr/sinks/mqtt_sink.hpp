@@ -70,7 +70,7 @@ public:
     void stop() override;
     void flush() override;
 
-    void send(const telemetry_vss_Signal& msg) override;
+    void send(const vss_Signal& msg) override;
     void send(const telemetry_events_Event& msg) override;
     void send(const telemetry_metrics_Gauge& msg) override;
     void send(const telemetry_metrics_Counter& msg) override;
@@ -95,7 +95,7 @@ private:
 
     void publish_loop();
     void publish(const std::string& topic, const nlohmann::json& payload);
-    nlohmann::json encode_header(const telemetry_Header& header);
+    nlohmann::json encode_header(const vss_types_Header& header);
 
     // Mosquitto callbacks
     static void on_connect(struct mosquitto* mosq, void* obj, int rc);

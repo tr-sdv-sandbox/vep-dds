@@ -172,13 +172,16 @@ int main(int argc, char* argv[]) {
             msg.event_type = const_cast<char*>(evt.event_type);
             msg.severity = evt.severity;
 
-            // Simulate some payload (e.g., JSON with event details)
-            std::string payload_str = R"({"simulated": true, "seq": )" +
-                                       std::to_string(event_count) + "}";
-            msg.payload._buffer = reinterpret_cast<uint8_t*>(
-                const_cast<char*>(payload_str.c_str()));
-            msg.payload._length = payload_str.size();
-            msg.payload._maximum = payload_str.size();
+            // Add attributes (replaces old payload field)
+            // Note: attributes is a sequence of KeyValue, we skip for simple simulation
+            msg.attributes._buffer = nullptr;
+            msg.attributes._length = 0;
+            msg.attributes._maximum = 0;
+
+            // Context signals (replaces old payload)
+            msg.context._buffer = nullptr;
+            msg.context._length = 0;
+            msg.context._maximum = 0;
 
             writer.write(msg);
             event_count++;

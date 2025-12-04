@@ -36,11 +36,17 @@ struct CapturedSignal {
     std::string source_id;
     int64_t timestamp_ns;
     uint32_t seq_num;
-    telemetry_vss_Quality quality;
-    telemetry_vss_ValueType value_type;
+    vss_types_Quality quality;
+    vss_types_ValueType value_type;
     bool bool_value;
+    int8_t int8_value;
+    int16_t int16_value;
     int32_t int32_value;
     int64_t int64_value;
+    uint8_t uint8_value;
+    uint16_t uint16_value;
+    uint32_t uint32_value;
+    uint64_t uint64_value;
     float float_value;
     double double_value;
     std::string string_value;
@@ -68,7 +74,7 @@ public:
     bool start() override { running_ = true; return true; }
     void stop() override { running_ = false; }
 
-    void send(const telemetry_vss_Signal& msg) override;
+    void send(const vss_Signal& msg) override;
     void send(const telemetry_events_Event& msg) override;
     void send(const telemetry_metrics_Gauge& msg) override;
     void send(const telemetry_metrics_Counter& msg) override;

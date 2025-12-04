@@ -22,6 +22,7 @@
 
 #include "common/dds_wrapper.hpp"
 #include "telemetry.h"
+#include "vss_signal.h"
 
 #include <functional>
 #include <memory>
@@ -35,7 +36,7 @@ namespace vdr {
 /*
  * Callback types for received data.
  */
-using VssSignalCallback = std::function<void(const telemetry_vss_Signal&)>;
+using VssSignalCallback = std::function<void(const vss_Signal&)>;
 using EventCallback = std::function<void(const telemetry_events_Event&)>;
 using GaugeCallback = std::function<void(const telemetry_metrics_Gauge&)>;
 using CounterCallback = std::function<void(const telemetry_metrics_Counter&)>;

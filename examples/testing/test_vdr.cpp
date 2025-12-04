@@ -48,7 +48,7 @@ bool TestVdr::start(std::unique_ptr<OutputSink> sink,
         subscriptions_ = std::make_unique<SubscriptionManager>(*participant_, config_);
 
         // Wire callbacks to sink
-        subscriptions_->on_vss_signal([this](const telemetry_vss_Signal& msg) {
+        subscriptions_->on_vss_signal([this](const vss_Signal& msg) {
             sink_->send(msg);
         });
 

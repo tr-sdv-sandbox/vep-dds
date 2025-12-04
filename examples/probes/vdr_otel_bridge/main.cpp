@@ -26,6 +26,7 @@
 #include "common/qos_profiles.hpp"
 #include "common/time_utils.hpp"
 #include "telemetry.h"
+#include "vss_types.h"
 
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
@@ -190,7 +191,7 @@ private:
         }
 
         for (size_t i = 0; i < label_keys_.size() && i < 16; ++i) {
-            telemetry_KeyValue kv = {};
+            vss_types_KeyValue kv = {};
             kv.key = const_cast<char*>(label_keys_[i].c_str());
             kv.value = const_cast<char*>(label_values_[i].c_str());
             labels_.push_back(kv);
@@ -233,7 +234,7 @@ private:
         }
 
         for (size_t i = 0; i < label_keys_.size() && i < 16; ++i) {
-            telemetry_KeyValue kv = {};
+            vss_types_KeyValue kv = {};
             kv.key = const_cast<char*>(label_keys_[i].c_str());
             kv.value = const_cast<char*>(label_values_[i].c_str());
             labels_.push_back(kv);
@@ -276,7 +277,7 @@ private:
         }
 
         for (size_t i = 0; i < label_keys_.size() && i < 16; ++i) {
-            telemetry_KeyValue kv = {};
+            vss_types_KeyValue kv = {};
             kv.key = const_cast<char*>(label_keys_[i].c_str());
             kv.value = const_cast<char*>(label_values_[i].c_str());
             labels_.push_back(kv);
@@ -326,7 +327,7 @@ private:
     std::string correlation_buf_;
     std::vector<std::string> label_keys_;
     std::vector<std::string> label_values_;
-    std::vector<telemetry_KeyValue> labels_;
+    std::vector<vss_types_KeyValue> labels_;
     std::vector<telemetry_metrics_HistogramBucket> buckets_;
 };
 
@@ -419,7 +420,7 @@ private:
         }
 
         for (size_t i = 0; i < field_keys_.size() && i < 16; ++i) {
-            telemetry_KeyValue kv = {};
+            vss_types_KeyValue kv = {};
             kv.key = const_cast<char*>(field_keys_[i].c_str());
             kv.value = const_cast<char*>(field_values_[i].c_str());
             fields_.push_back(kv);
@@ -445,7 +446,7 @@ private:
     std::string message_buf_;
     std::vector<std::string> field_keys_;
     std::vector<std::string> field_values_;
-    std::vector<telemetry_KeyValue> fields_;
+    std::vector<vss_types_KeyValue> fields_;
 };
 
 int main(int argc, char* argv[]) {

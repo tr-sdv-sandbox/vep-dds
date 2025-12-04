@@ -20,6 +20,8 @@
 #include "common/qos_profiles.hpp"
 #include "common/time_utils.hpp"
 #include "telemetry.h"
+#include "vss_signal.h"
+#include "vss_types.h"
 
 #include <gtest/gtest.h>
 #include <glog/logging.h>
@@ -47,14 +49,14 @@ TEST_F(DdsWrapperTest, ParticipantCreation) {
 TEST_F(DdsWrapperTest, TopicCreation) {
     dds::Participant participant(DDS_DOMAIN_DEFAULT);
 
-    dds::Topic topic(participant, &telemetry_vss_Signal_desc, "test/vss/signals");
+    dds::Topic topic(participant, &vss_Signal_desc, "test/vss/signals");
     EXPECT_TRUE(topic);
     EXPECT_EQ(topic.name(), "test/vss/signals");
 }
 
 TEST_F(DdsWrapperTest, WriterCreation) {
     dds::Participant participant(DDS_DOMAIN_DEFAULT);
-    dds::Topic topic(participant, &telemetry_vss_Signal_desc, "test/writer");
+    dds::Topic topic(participant, &vss_Signal_desc, "test/writer");
     dds::Writer writer(participant, topic);
 
     EXPECT_TRUE(writer);
@@ -62,7 +64,7 @@ TEST_F(DdsWrapperTest, WriterCreation) {
 
 TEST_F(DdsWrapperTest, ReaderCreation) {
     dds::Participant participant(DDS_DOMAIN_DEFAULT);
-    dds::Topic topic(participant, &telemetry_vss_Signal_desc, "test/reader");
+    dds::Topic topic(participant, &vss_Signal_desc, "test/reader");
     dds::Reader reader(participant, topic);
 
     EXPECT_TRUE(reader);
@@ -83,7 +85,7 @@ TEST_F(DdsWrapperTest, WriteAndRead) {
     dds::Participant participant(DDS_DOMAIN_DEFAULT);
 
     auto qos = dds::qos_profiles::reliable_standard(10);
-    dds::Topic topic(participant, &telemetry_vss_Signal_desc,
+    dds::Topic topic(participant, &vss_Signal_desc,
                      "test/pubsub", qos.get());
 
     dds::Writer writer(participant, topic, qos.get());
@@ -93,15 +95,15 @@ TEST_F(DdsWrapperTest, WriteAndRead) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // Write a sample
-    telemetry_vss_Signal msg = {};
+    vss_Signal msg = {};
     msg.path = const_cast<char*>("Vehicle.Speed");
     msg.header.source_id = const_cast<char*>("test");
     msg.header.timestamp_ns = utils::now_ns();
     msg.header.seq_num = 1;
     msg.header.correlation_id = const_cast<char*>("");
-    msg.quality = telemetry_vss_QUALITY_VALID;
-    msg.value_type = telemetry_vss_VALUE_TYPE_DOUBLE;
-    msg.double_value = 42.0;
+    msg.quality = vss_types_QUALITY_VALID;
+    msg.value.type = vss_types_VALUE_TYPE_DOUBLE;
+    msg.value.double_value = 42.0;
 
     writer.write(msg);
 
@@ -110,9 +112,9 @@ TEST_F(DdsWrapperTest, WriteAndRead) {
 
     // Read samples using callback (safe for string access)
     size_t count = 0;
-    reader.take_each<telemetry_vss_Signal>([&](const telemetry_vss_Signal& sample) {
+    reader.take_each<vss_Signal>([&](const vss_Signal& sample) {
         EXPECT_STREQ(sample.path, "Vehicle.Speed");
-        EXPECT_DOUBLE_EQ(sample.double_value, 42.0);
+        EXPECT_DOUBLE_EQ(sample.value.double_value, 42.0);
         ++count;
     }, 10);
 

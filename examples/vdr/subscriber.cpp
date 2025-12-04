@@ -29,7 +29,7 @@ SubscriptionManager::SubscriptionManager(dds::Participant& participant,
     if (config_.vss_signals) {
         auto qos = dds::qos_profiles::reliable_standard(100);
         topic_vss_signal_ = std::make_unique<dds::Topic>(
-            participant_, &telemetry_vss_Signal_desc,
+            participant_, &vss_Signal_desc,
             "rt/vss/signals", qos.get());
         reader_vss_signal_ = std::make_unique<dds::Reader>(
             participant_, *topic_vss_signal_, qos.get());
@@ -164,7 +164,7 @@ void SubscriptionManager::poll_loop() {
     while (running_) {
         // Poll each reader
         if (reader_vss_signal_ && cb_vss_signal_) {
-            process_reader<telemetry_vss_Signal>(*reader_vss_signal_, cb_vss_signal_);
+            process_reader<vss_Signal>(*reader_vss_signal_, cb_vss_signal_);
         }
 
         if (reader_event_ && cb_event_) {
