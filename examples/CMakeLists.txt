@@ -234,37 +234,21 @@ else()
 endif()
 
 # ============================================================================
-# Example Probes
+# Example Probes (simple demo probes for testing)
 # ============================================================================
 
-# Metrics probe
+# NOTE: Production probes (vdr_vss_can_probe, vdr_otel_probe, vdr_avtp_probe)
+# are now in vep-core/probes/ with their own per-probe IDL definitions.
+
+# Metrics probe (simple demo)
 add_executable(vdr_metrics_probe probes/vdr_metrics_probe/main.cpp)
 target_include_directories(vdr_metrics_probe PRIVATE ${VEP_DDS_ROOT}/src)
 target_link_libraries(vdr_metrics_probe PRIVATE vdr_common example_telemetry_idl glog::glog)
 
-# Event probe
+# Event probe (simple demo)
 add_executable(vdr_event_probe probes/vdr_event_probe/main.cpp)
 target_include_directories(vdr_event_probe PRIVATE ${VEP_DDS_ROOT}/src)
 target_link_libraries(vdr_event_probe PRIVATE vdr_common example_telemetry_idl glog::glog)
-
-# OTLP-to-DDS Bridge
-add_executable(vdr_otel_bridge probes/vdr_otel_bridge/main.cpp)
-target_include_directories(vdr_otel_bridge PRIVATE ${VEP_DDS_ROOT}/src ${PROTO_OUTPUT_DIR})
-target_link_libraries(vdr_otel_bridge PRIVATE vdr_common example_telemetry_idl otlp_proto glog::glog)
-
-# VSS DAG Probe (if libvssdag available)
-if(TARGET vssdag)
-    add_executable(vdr_vssdag_probe probes/vdr_vssdag_probe/main.cpp)
-    target_include_directories(vdr_vssdag_probe PRIVATE ${VEP_DDS_ROOT}/src)
-    target_link_libraries(vdr_vssdag_probe PRIVATE vdr_common example_telemetry_idl vssdag yaml-cpp::yaml-cpp glog::glog)
-endif()
-
-# AVTP Probe (if Open1722 available)
-if(TARGET open1722)
-    add_executable(vdr_avtp_probe probes/vdr_avtp_probe/main.cpp)
-    target_include_directories(vdr_avtp_probe PRIVATE ${VEP_DDS_ROOT}/src)
-    target_link_libraries(vdr_avtp_probe PRIVATE vdr_common example_telemetry_idl open1722 glog::glog)
-endif()
 
 # ============================================================================
 # Tests (if GTest available)
@@ -288,7 +272,7 @@ endif()
 # Installation (optional - examples not installed by default)
 # ============================================================================
 
-install(TARGETS vdr_metrics_probe vdr_event_probe vdr_otel_bridge
+install(TARGETS vdr_metrics_probe vdr_event_probe
     RUNTIME DESTINATION bin
     COMPONENT examples
     OPTIONAL
