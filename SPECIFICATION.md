@@ -327,21 +327,7 @@ struct EncodedSignalBatch {
 │       │   └── main.cpp
 │       ├── event_probe/
 │       │   └── main.cpp
-│       ├── otel_bridge/
-│       │   └── main.cpp             # OTLP-to-DDS bridge
-│       ├── vssdag_probe/
-│       │   └── main.cpp             # CAN-to-VSS with libvssdag
-│       └── avtp_probe/
-│           └── main.cpp             # IEEE 1722 AVTP CAN bridge
-├── proto/
-│   └── opentelemetry/proto/       # OTLP protobuf definitions
-│       ├── common/v1/common.proto
-│       ├── resource/v1/resource.proto
-│       ├── metrics/v1/metrics.proto
-│       ├── logs/v1/logs.proto
-│       └── collector/
-│           ├── metrics/v1/metrics_service.proto
-│           └── logs/v1/logs_service.proto
+│       └── (probes moved to vep-core)
 ├── config/
 │   ├── vdr_config.yaml           # Basic VDR config (current)
 │   ├── vdr_offboard_policy.yaml  # Offboard policy (planned)
@@ -800,14 +786,14 @@ Applications instrumented with OpenTelemetry SDK can send telemetry (metrics, lo
 
 #### Option A: Direct OTLP Receiver (Implemented)
 
-The `probe_otel_bridge` binary implements OTLP gRPC services directly:
+The `vdr_otel_probe` binary (in vep-core) implements OTLP gRPC services directly:
 
 ```bash
-# Start the bridge on default port 4317
-./probe_otel_bridge
+# Start the probe on default port 4317
+./vdr_otel_probe
 
 # Or specify custom port
-./probe_otel_bridge 4318
+./vdr_otel_probe 4318
 ```
 
 Configure OTel SDK exporters to point to the bridge:

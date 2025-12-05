@@ -28,9 +28,6 @@ cmake --build build -j$(nproc)
 | `probe_vss` | VSS signal publisher |
 | `probe_events` | Vehicle event publisher |
 | `probe_metrics` | Prometheus-style metrics publisher |
-| `probe_otel_bridge` | OpenTelemetry gRPC to DDS bridge |
-| `probe_vssdag` | CAN-to-VSS transformation (requires libvssdag) |
-| `probe_avtp` | IEEE 1722 AVTP bridge (requires Open1722) |
 
 ## Usage
 

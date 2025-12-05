@@ -20,9 +20,6 @@ cmake --build build -j$(nproc)
 ./build/vdr_vss_probe             # VSS signal probe
 ./build/vdr_metrics_probe         # Prometheus-style metrics probe
 ./build/vdr_event_probe           # Vehicle events probe
-./build/vdr_otel_bridge           # OpenTelemetry to DDS bridge
-./build/vdr_vssdag_probe          # CAN-to-VSS transformation (requires libvssdag)
-./build/vdr_avtp_probe --simulate # IEEE 1722 AVTP probe (simulation mode)
 ```
 
 ## Architecture Overview
